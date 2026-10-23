@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>丹青取色 · 从古画中提取中国传统色</title>
+<meta name="description" content="上传任意古画或照片，自动提取主色并匹配 526 种中国传统色，生成可分享的色卡海报，一键导出 CSS 变量与 JSON。全程本地处理，无需上传服务器。">
+<meta property="og:title" content="丹青取色 · 从古画中提取中国传统色">
+<meta property="og:description" content="千里江山图里有哪些颜色？上传画作，自动匹配中国传统色，生成色卡海报。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%239e2f26'/%3E%3Ctext x='32' y='30' font-size='26' text-anchor='middle' fill='%23f6f1e4' font-family='serif'%3E丹%3C/text%3E%3Ctext x='32' y='56' font-size='26' text-anchor='middle' fill='%23f6f1e4' font-family='serif'%3E青%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>丹<em>青</em>取色</h1>
+    <p class="slogan">从古画里，取一抹中国传统色</p>
+  </div>
+  <nav>
+    <a href="#about">原理</a>
+    <a id="gh-link" href="https://github.com/cchichi/danqing-palette" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section>
+    <div id="dropzone" tabindex="0" role="button" aria-label="上传图片">
+      <div class="dz-seal">拾</div>
+      <p>拖拽、粘贴（Ctrl + V）或点击，上传一幅画</p>
+      <p class="dz-hint">支持 JPG / PNG / WebP · 图片只在你的浏览器本地处理，不会上传到任何服务器</p>
+      <input type="file" id="file" accept="image/*" hidden>
+    </div>
+    <div id="samples" class="samples" aria-label="内置示例画作"></div>
+  </section>
+
+  <section id="result" hidden>
+    <figure class="painting-frame">
+      <div class="painting-wrap"><img id="preview" alt="画作预览"></div>
+      <figcaption id="painting-name"></figcaption>
+    </figure>
+
+    <div class="palette-panel">
+      <div class="panel-head">
+        <h2 id="palette-title">画中拾得</h2>
+        <div class="actions">
+          <button class="btn" id="btn-css" type="button">复制 CSS 变量</button>
+          <button class="btn" id="btn-json" type="button">复制 JSON</button>
+          <button class="btn btn-primary" id="btn-poster" type="button">下载色卡海报</button>
+        </div>
+      </div>
+      <div id="palette"></div>
+    </div>
+  </section>
+
+  <section id="about">
+    <div>
+      <h3>它怎么做</h3>
+      <p>先把图片缩到 260px，用 k-means++ 聚类出主要色簇，再在 CIELAB 空间用 CIE94 色差公式，从 526 种中国传统色里为每一簇找到最贴近的那一味。色块右上角的小圆点是画面的原始色，旁边就是它对应的传统色名。</p>
+    </div>
+    <div>
+      <h3>颜色从哪来</h3>
+      <p>传统色数据来自 <a href="https://zhongguose.com" target="_blank" rel="noopener">zhongguose.com</a>（中国传统色手册），共 526 色；示例画作均为公有领域藏品照片，取自 Wikimedia Commons。</p>
+    </div>
+    <div>
+      <h3>隐私与离线</h3>
+      <p>没有任何后端、没有统计脚本，取色全部在你的浏览器里完成。页面存为单文件夹后，断网也能用。</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>丹青取色 · 把古画的颜色变成你的配色</span>
+  <span>数据：zhongguose.com · 样图：Wikimedia Commons（公有领域）· MIT License</span>
+</footer>
+
+<div id="toast" role="status"></div>
+
+<script src="js/colors.js"></script>
+<script src="js/samples.js"></script>
+<script src="js/quantize.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
