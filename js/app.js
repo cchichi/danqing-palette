@@ -18,6 +18,7 @@
     btnCss: $('#btn-css'),
     btnJson: $('#btn-json'),
     btnPoster: $('#btn-poster'),
+    size: $('#poster-size'),
     toast: $('#toast')
   };
 
@@ -83,12 +84,18 @@
     els.result.hidden = false;
   }
 
+  function noteOf(name) {
+    var notes = window.TRADITIONAL_COLOR_NOTES || {};
+    return notes[name] || '';
+  }
+
   function buildChip(m) {
     var chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip';
     chip.title = '点击复制 ' + m.hex;
     var dark = DQ.luminance(m.rgb) > 168;
+    var note = noteOf(m.name);
     chip.innerHTML =
       '<span class="chip-swatch' + (dark ? ' is-light' : '') + '" style="background:' + m.hex + '">' +
         '<i class="chip-source" style="background:' + m.sourceHex + '"></i>' +
@@ -97,6 +104,7 @@
       '<span class="chip-meta">' +
         '<code>' + m.hex + '</code>' +
         '<span class="chip-py">' + m.pinyin + '</span>' +
+        (note ? '<span class="chip-note">' + note + '</span>' : '') +
         '<span class="chip-sub">占比 ' + (m.weight * 100).toFixed(1) + '% · 色差 ' + m.dist.toFixed(0) + '</span>' +
       '</span>';
     chip.addEventListener('click', function () {
@@ -120,11 +128,14 @@
     return JSON.stringify({
       painting: current.painting,
       colors: current.matched.map(function (m) {
-        return {
+        var item = {
           name: m.name, pinyin: m.pinyin, hex: m.hex, rgb: m.rgb,
           weight: +(m.weight * 100).toFixed(1),
           source: m.sourceHex
         };
+        var note = noteOf(m.name);
+        if (note) item.note = note;
+        return item;
       })
     }, null, 2);
   }
@@ -148,12 +159,20 @@
     }
   }
 
-  /* ---------- 色卡海报（1080 × 1620） ---------- */
+  /* ---------- 色卡海报（多尺寸） ---------- */
 
   var SERIF = '"Songti SC","STSong","STZhongsong","SimSun","Noto Serif CJK SC",serif';
 
-  function drawPoster() {
-    var W = 1080, H = 1620;
+  // 各尺寸的版式参数：[宽, 高, 顶边距, 色带高, 原画小样最大高, 落款Y, 标题字号, 标题步距, 印章边长, 原画小样区宽]
+  var POSTER_PLANS = {
+    poster:    { w: 1080, h: 1620, top: 190, band: 760, thumb: 200, coloY: 1444, tSize: 76, tStep: 96, seal: 92,  thumbW: 854 },
+    wallpaper: { w: 1080, h: 2340, top: 260, band: 1160, thumb: 300, coloY: 2160, tSize: 76, tStep: 96, seal: 92,  thumbW: 854 },
+    square:    { w: 1080, h: 1080, top: 120, band: 430, thumb: 0, coloY: 940, tSize: 52, tStep: 68, seal: 68, thumbW: 0 }
+  };
+
+  function drawPoster(sizeKey) {
+    var p = POSTER_PLANS[sizeKey] || POSTER_PLANS.poster;
+    var W = p.w, H = p.h;
     var c = document.createElement('canvas');
     c.width = W; c.height = H;
     var x = c.getContext('2d');
@@ -173,8 +192,8 @@
     var mx = 78;
     var gap = 18;
     var bandW = Math.floor((W - mx * 2 - titleW - gap * (n - 1)) / n);
-    var bandY = 190;
-    var bandH = 760;
+    var bandY = p.top;
+    var bandH = p.band;
 
     colors.forEach(function (m, i) {
       var bx = mx + i * (bandW + gap);
@@ -193,11 +212,12 @@
       x.strokeStyle = 'rgba(255,255,255,.85)';
       x.stroke();
 
-      // 竖排色名
+      // 竖排色名（色带较矮时放在色带下沿之上，较高时沉底）
       var dark = DQ.luminance(m.rgb) > 168;
       x.fillStyle = dark ? '#3a352c' : '#f7f2e6';
       var name = m.name;
       var fs = name.length > 4 ? 34 : 44;
+      if (bandH < 520) fs = name.length > 4 ? 26 : 32;
       x.font = '600 ' + fs + 'px ' + SERIF;
       x.textAlign = 'center';
       x.textBaseline = 'top';
@@ -219,44 +239,32 @@
     // 竖排主标题
     var title = '丹青取色';
     x.fillStyle = '#2f2b24';
-    x.font = '700 76px ' + SERIF;
+    x.font = '700 ' + p.tSize + 'px ' + SERIF;
     var tx = W - mx - 30;
     var ty = bandY + 20;
     for (var t = 0; t < title.length; t++) {
-      x.fillText(title[t], tx, ty + t * 96);
+      x.fillText(title[t], tx, ty + t * p.tStep);
     }
 
     // 印章
-    var sealS = 92;
-    var sx = tx - sealS / 2, sy = ty + title.length * 96 + 30;
+    var sealS = p.seal;
+    var sx = tx - sealS / 2, sy = ty + title.length * p.tStep + 24;
     x.fillStyle = '#9e2f26';
     roundRect(x, sx, sy, sealS, sealS, 10);
     x.fill();
     x.fillStyle = '#f6f1e4';
-    x.font = '600 34px ' + SERIF;
-    x.fillText('丹', tx, sy + 12);
-    x.fillText('青', tx, sy + 50);
+    x.font = '600 ' + Math.round(sealS * 0.37) + 'px ' + SERIF;
+    x.fillText('丹', tx, sy + sealS * 0.13);
+    x.fillText('青', tx, sy + sealS * 0.55);
 
-    // 落款
-    x.fillStyle = '#6d6553';
-    x.font = '28px ' + SERIF;
-    x.textAlign = 'left';
-    x.fillText('画 · ' + current.painting, mx, 1444);
-    x.fillText('色 · 匹配自 526 种中国传统色', mx, 1492);
-    x.textAlign = 'right';
-    x.fillText(new Date().toLocaleDateString('zh-CN'), W - mx, 1444);
-    x.font = '24px ' + SERIF;
-    x.fillText('丹青取色 · 从古画中提取中国传统色', W - mx, 1492);
-
-    // 原画小样
+    // 原画小样（方图不画）
     var thumb = current.thumb;
-    if (thumb) {
+    if (thumb && p.thumb > 0) {
       var tw = thumb.width, thh = thumb.height;
-      var boxW = W - mx * 2 - titleW, boxH = 200;
-      var s3 = Math.min(boxW / tw, boxH / thh);
+      var s3 = Math.min(p.thumbW / tw, p.thumb / thh);
       var dw = Math.round(tw * s3), dh = Math.round(thh * s3);
-      var dx = mx + Math.round((boxW - dw) / 2);
-      var dy = 1170;
+      var dx = mx + Math.round((p.thumbW - dw) / 2);
+      var dy = bandY + bandH + 220;
       x.fillStyle = '#2e3b4e';
       x.fillRect(dx - 8, dy - 8, dw + 16, dh + 16);
       x.strokeStyle = '#c9a86a';
@@ -264,6 +272,17 @@
       x.strokeRect(dx - 4.5, dy - 4.5, dw + 9, dh + 9);
       x.drawImage(thumb, dx, dy, dw, dh);
     }
+
+    // 落款
+    x.fillStyle = '#6d6553';
+    x.font = '28px ' + SERIF;
+    x.textAlign = 'left';
+    x.fillText('画 · ' + current.painting, mx, p.coloY);
+    x.fillText('色 · 匹配自 526 种中国传统色', mx, p.coloY + 48);
+    x.textAlign = 'right';
+    x.fillText(new Date().toLocaleDateString('zh-CN'), W - mx, p.coloY);
+    x.font = '24px ' + SERIF;
+    x.fillText('丹青取色 · 从古画中提取中国传统色', W - mx, p.coloY + 48);
 
     return c;
   }
@@ -279,7 +298,8 @@
   }
 
   function downloadPoster() {
-    var c = drawPoster();
+    var sizeKey = els.size.value || 'poster';
+    var c = drawPoster(sizeKey);
     c.toBlob(function (blob) {
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
