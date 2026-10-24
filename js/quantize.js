@@ -62,10 +62,11 @@
   }
 
   // pixels: RGBA 序列（跳过透明像素），返回最多 maxKeep 个 [{rgb, weight}]，weight 之和为 1
-  function extractPalette(pixels, k, iters, maxKeep) {
+  function extractPalette(pixels, k, iters, maxKeep, mergeT) {
     k = k || 8;
     iters = iters || 14;
     maxKeep = maxKeep || 6;
+    mergeT = mergeT || 5;
     const n = pixels.length >> 2;
     const pts = []; // 有效像素索引
     for (let i = 0; i < n; i++) {
@@ -160,11 +161,11 @@
     }
     clusters.sort((a, b) => b.count - a.count);
 
-    // 合并过近的簇（Lab 色差 < 5 视为同一色）
+    // 合并过近的簇（Lab 色差小于 mergeT 视为同一色）
     const merged = [];
     for (const cl of clusters) {
       const lab = rgb2lab(cl.rgb[0], cl.rgb[1], cl.rgb[2]);
-      const hit = merged.find(m => dist94(m._lab, lab) < 5);
+      const hit = merged.find(m => dist94(m._lab, lab) < mergeT);
       if (hit) {
         const total = hit.count + cl.count;
         for (let i = 0; i < 3; i++) hit.rgb[i] = Math.round((hit.rgb[i] * hit.count + cl.rgb[i] * cl.count) / total);

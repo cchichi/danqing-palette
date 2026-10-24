@@ -19,6 +19,7 @@
     btnJson: $('#btn-json'),
     btnPoster: $('#btn-poster'),
     size: $('#poster-size'),
+    count: $('#color-count'),
     toast: $('#toast')
   };
 
@@ -40,6 +41,26 @@
     reader.readAsDataURL(file);
   }
 
+  // 按当前选择的色数取色；图片只解析一次，像素缓存在 current.imageData
+  function extractCurrent() {
+    var target = parseInt(els.count.value, 10) || 6;
+    var kk = Math.min(20, Math.max(8, target + 4));
+    var palette = DQ.extractPalette(current.imageData.data, kk, 14, target);
+    // 合并后凑不够所选色数时，逐步放宽合并阈值重试
+    for (var t = 4; palette.length < target && t >= 2; t--) {
+      palette = DQ.extractPalette(current.imageData.data, kk, 14, target, t);
+    }
+    return palette;
+  }
+
+  function recount() {
+    if (!current.imageData) return;
+    var palette = extractCurrent();
+    if (!palette.length) return;
+    current.matched = DQ.matchTraditional(palette);
+    render(current.src, current.painting);
+  }
+
   function analyze(img, name) {
     var MAX = 260;
     var scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
@@ -57,7 +78,9 @@
       toast('无法读取图片像素，请直接上传图片文件');
       return;
     }
-    var palette = DQ.extractPalette(imageData.data, 8);
+    current.imageData = imageData;
+    current.src = img.src;
+    var palette = extractCurrent();
     if (!palette.length) { toast('这张图没有可提取的颜色'); return; }
     current.matched = DQ.matchTraditional(palette);
     current.painting = name;
@@ -165,9 +188,9 @@
 
   // 各尺寸的版式参数：[宽, 高, 顶边距, 色带高, 原画小样最大高, 落款Y, 标题字号, 标题步距, 印章边长, 原画小样区宽]
   var POSTER_PLANS = {
-    poster:    { w: 1080, h: 1620, top: 190, band: 760, thumb: 200, coloY: 1444, tSize: 76, tStep: 96, seal: 92,  thumbW: 854 },
-    wallpaper: { w: 1080, h: 2340, top: 260, band: 1160, thumb: 300, coloY: 2160, tSize: 76, tStep: 96, seal: 92,  thumbW: 854 },
-    square:    { w: 1080, h: 1080, top: 120, band: 430, thumb: 0, coloY: 940, tSize: 52, tStep: 68, seal: 68, thumbW: 0 }
+    poster:    { w: 1080, h: 1620, top: 190, band: 760, thumb: 200, coloY: 1444, tSize: 76, tStep: 96, seal: 92,  thumbW: 854, tileH: 260 },
+    wallpaper: { w: 1080, h: 2340, top: 260, band: 1160, thumb: 300, coloY: 2160, tSize: 76, tStep: 96, seal: 92,  thumbW: 854, tileH: 380 },
+    square:    { w: 1080, h: 1080, top: 120, band: 430, thumb: 0, coloY: 940, tSize: 52, tStep: 68, seal: 68, thumbW: 0, tileH: 280 }
   };
 
   function drawPoster(sizeKey) {
@@ -191,50 +214,59 @@
     var titleW = 128;
     var mx = 78;
     var gap = 18;
-    var bandW = Math.floor((W - mx * 2 - titleW - gap * (n - 1)) / n);
     var bandY = p.top;
-    var bandH = p.band;
+    var contentBottom;
 
-    colors.forEach(function (m, i) {
-      var bx = mx + i * (bandW + gap);
-      // 色块
-      x.fillStyle = m.hex;
-      x.fillRect(bx, bandY, bandW, bandH);
-      // 细描边
-      x.strokeStyle = 'rgba(0,0,0,.08)';
-      x.strokeRect(bx + .5, bandY + .5, bandW - 1, bandH - 1);
-      // 原色小圆
-      x.beginPath();
-      x.arc(bx + bandW / 2, bandY + 56, 22, 0, Math.PI * 2);
-      x.fillStyle = m.sourceHex;
-      x.fill();
-      x.lineWidth = 3;
-      x.strokeStyle = 'rgba(255,255,255,.85)';
-      x.stroke();
+    if (n <= 6) {
+      // 色带版式
+      var bandW = Math.floor((W - mx * 2 - titleW - gap * (n - 1)) / n);
+      var bandH = p.band;
 
-      // 竖排色名（色带较矮时放在色带下沿之上，较高时沉底）
-      var dark = DQ.luminance(m.rgb) > 168;
-      x.fillStyle = dark ? '#3a352c' : '#f7f2e6';
-      var name = m.name;
-      var fs = name.length > 4 ? 34 : 44;
-      if (bandH < 520) fs = name.length > 4 ? 26 : 32;
-      x.font = '600 ' + fs + 'px ' + SERIF;
-      x.textAlign = 'center';
-      x.textBaseline = 'top';
-      var cy = bandY + bandH - 36 - name.length * fs * 1.18;
-      for (var j = 0; j < name.length; j++) {
-        x.fillText(name[j], bx + bandW / 2, cy + j * fs * 1.18);
-      }
+      colors.forEach(function (m, i) {
+        var bx = mx + i * (bandW + gap);
+        // 色块
+        x.fillStyle = m.hex;
+        x.fillRect(bx, bandY, bandW, bandH);
+        // 细描边
+        x.strokeStyle = 'rgba(0,0,0,.08)';
+        x.strokeRect(bx + .5, bandY + .5, bandW - 1, bandH - 1);
+        // 原色小圆
+        x.beginPath();
+        x.arc(bx + bandW / 2, bandY + 56, 22, 0, Math.PI * 2);
+        x.fillStyle = m.sourceHex;
+        x.fill();
+        x.lineWidth = 3;
+        x.strokeStyle = 'rgba(255,255,255,.85)';
+        x.stroke();
 
-      // 块下信息
-      x.fillStyle = '#3a352c';
-      x.font = '26px "SFMono-Regular",Consolas,monospace';
-      x.fillText(m.hex, bx + bandW / 2, bandY + bandH + 26);
-      x.fillStyle = '#8a7f68';
-      x.font = '24px ' + SERIF;
-      x.fillText(m.pinyin, bx + bandW / 2, bandY + bandH + 66);
-      x.fillText((m.weight * 100).toFixed(1) + '%', bx + bandW / 2, bandY + bandH + 102);
-    });
+        // 竖排色名（色带较矮时放在色带下沿之上，较高时沉底）
+        var dark = DQ.luminance(m.rgb) > 168;
+        x.fillStyle = dark ? '#3a352c' : '#f7f2e6';
+        var name = m.name;
+        var fs = name.length > 4 ? 34 : 44;
+        if (bandH < 520) fs = name.length > 4 ? 26 : 32;
+        x.font = '600 ' + fs + 'px ' + SERIF;
+        x.textAlign = 'center';
+        x.textBaseline = 'top';
+        var cy = bandY + bandH - 36 - name.length * fs * 1.18;
+        for (var j = 0; j < name.length; j++) {
+          x.fillText(name[j], bx + bandW / 2, cy + j * fs * 1.18);
+        }
+
+        // 块下信息
+        x.fillStyle = '#3a352c';
+        x.font = '26px "SFMono-Regular",Consolas,monospace';
+        x.fillText(m.hex, bx + bandW / 2, bandY + bandH + 26);
+        x.fillStyle = '#8a7f68';
+        x.font = '24px ' + SERIF;
+        x.fillText(m.pinyin, bx + bandW / 2, bandY + bandH + 66);
+        x.fillText((m.weight * 100).toFixed(1) + '%', bx + bandW / 2, bandY + bandH + 102);
+      });
+      contentBottom = bandY + bandH + 102;
+    } else {
+      // 网格版式：7 色以上色带会太窄，改为两行色块
+      contentBottom = drawTiles(x, colors, p, W, mx, titleW, bandY);
+    }
 
     // 竖排主标题
     var title = '丹青取色';
@@ -264,7 +296,7 @@
       var s3 = Math.min(p.thumbW / tw, p.thumb / thh);
       var dw = Math.round(tw * s3), dh = Math.round(thh * s3);
       var dx = mx + Math.round((p.thumbW - dw) / 2);
-      var dy = bandY + bandH + 220;
+      var dy = (n <= 6) ? bandY + p.band + 220 : contentBottom + 60;
       x.fillStyle = '#2e3b4e';
       x.fillRect(dx - 8, dy - 8, dw + 16, dh + 16);
       x.strokeStyle = '#c9a86a';
@@ -285,6 +317,60 @@
     x.fillText('丹青取色 · 从古画中提取中国传统色', W - mx, p.coloY + 48);
 
     return c;
+  }
+
+  // 7 色以上的网格版式：两行圆角色块，名称与色值写在色块下方
+  function drawTiles(x, colors, p, W, mx, titleW, topY) {
+    var n = colors.length;
+    var cols = Math.ceil(n / 2);
+    var gap = 16;
+    var areaW = W - mx * 2 - titleW;
+    var tw = Math.floor((areaW - gap * (cols - 1)) / cols);
+    var th = p.tileH;
+    var infoH = 90;
+    var rowH = th + infoH;
+    var rows = Math.ceil(n / cols);
+    var idx = 0;
+
+    for (var r = 0; r < rows; r++) {
+      var cnt = Math.min(cols, n - r * cols);
+      var rowW = cnt * tw + (cnt - 1) * gap;
+      var x0 = mx + Math.round((areaW - rowW) / 2);
+      for (var c = 0; c < cnt; c++) {
+        var m = colors[idx++];
+        var tx = x0 + c * (tw + gap);
+        var ty = topY + r * (rowH + gap);
+
+        x.fillStyle = m.hex;
+        roundRect(x, tx, ty, tw, th, 10);
+        x.fill();
+        x.strokeStyle = 'rgba(0,0,0,.08)';
+        x.lineWidth = 1;
+        x.stroke();
+
+        // 原色小圆
+        x.beginPath();
+        x.arc(tx + tw - 26, ty + 26, 12, 0, Math.PI * 2);
+        x.fillStyle = m.sourceHex;
+        x.fill();
+        x.lineWidth = 2.5;
+        x.strokeStyle = 'rgba(255,255,255,.85)';
+        x.stroke();
+
+        // 色块下信息
+        x.textAlign = 'center';
+        x.textBaseline = 'top';
+        x.fillStyle = '#3a352c';
+        x.font = '600 ' + (m.name.length > 4 ? 20 : 24) + 'px ' + SERIF;
+        x.fillText(m.name, tx + tw / 2, ty + th + 10);
+        x.font = '20px "SFMono-Regular",Consolas,monospace';
+        x.fillText(m.hex, tx + tw / 2, ty + th + 42);
+        x.fillStyle = '#8a7f68';
+        x.font = '17px ' + SERIF;
+        x.fillText((m.weight * 100).toFixed(1) + '%', tx + tw / 2, ty + th + 68);
+      }
+    }
+    return topY + rows * rowH + (rows - 1) * gap;
   }
 
   function roundRect(x, px, py, w, h, r) {
@@ -366,6 +452,7 @@
     els.btnCss.addEventListener('click', function () { copyText(cssText(), 'CSS 变量已复制'); });
     els.btnJson.addEventListener('click', function () { copyText(jsonText(), 'JSON 已复制'); });
     els.btnPoster.addEventListener('click', downloadPoster);
+    els.count.addEventListener('change', recount);
   }
 
   init();

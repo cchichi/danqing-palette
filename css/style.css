@@ -240,6 +240,13 @@ main {
 .btn-primary { background: var(--cinnabar); border-color: var(--cinnabar); color: #f6f1e4; }
 .btn-primary:hover { background: #7f231c; border-color: #7f231c; color: #fff; }
 
+.count-wrap {
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: 2px;
+  align-self: center;
+}
+
 .btn-select {
   -webkit-appearance: none;
   appearance: none;
